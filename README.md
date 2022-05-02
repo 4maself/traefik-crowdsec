@@ -20,6 +20,9 @@ Update the config file in _prometheus/config_ and rename the Traefik host and cr
 Adjust the following in the _traefik/traefik.yml_ file:
 - Change the email to something you own. LetsEncrypt will send you email notifications when certificates are expiring.
 
+## Update the docker-compose
+- Update the grafana environment/labels to a (sub)domain you own, so that Traefik can request certificates for you and you can use your dashboard.
+
 ## Configuration
 ### Register your bouncer
 First, we'll need to register our bouncer to Crowdsec, so we can block unwanted guests.
@@ -29,10 +32,17 @@ Copy the served key and paste it in the compose behind the _CROWDSEC_BOUNCER_API
 Next, restart the Traefik bouncer with the following:
 - `docker-compose restart bouncer`
 
+The stack should now run as expected. Please, let me know if there's anything wrong/missing.
+
+## What to do after?
+This is basically everything you'll need to get started (with some extra's). You'll still have to configure Grafana to get some nice visuals out of your metrics.
+
+You can adjust some things here and there to suit your needs and add containers like Nextcloud, Gitlab, Bitwarden/Vaultwarden and whatever you'd like to host. You can use the grafana service as a reference for the basic labels you'll need to make Traefik proxy to your service and generate certificates for these services.
+
 
 ## Other notes
 ### Folder/file permissions
-In case Prometheus or grafana don't start correctly, it could be due to file permissions.
+In case Prometheus and/or grafana doesn't start correctly, it could be due to file permissions.
 To fix this, you can use the following (as root) in the repository root:
 `chown 472:472 -R grafana && chown 1000:1000 -R prometheus`
 
