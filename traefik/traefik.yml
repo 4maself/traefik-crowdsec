@@ -1,0 +1,49 @@
+entryPoints:
+  web:
+    address: :80
+    http:
+      # I've added the redirect here to make sure my clients only connect on 443 with SSL
+      redirections:
+        entryPoint:
+          to: web-secure
+  web-secure:
+    address: :443
+    http:
+      middlewares:
+        - crowdsec-bouncer@file
+  metrics:
+    address: :6060
+
+api:
+  dashboard: true
+  insecure: true
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    watch: true
+  file:
+    directory: /config
+    watch: true
+
+# I've added prometheus to keep track of the metrics in Grafana
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addRoutersLabels: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "my-email@example.com"
+      storage: acme.json
+      tlsChallenge: {}
+# Use letsencrypt-testing to make sure your setup is working before moving everything over to the production server of LetsEncrypt      
+  letsencrypt-testing:
+    acme:
+      email: "my-email@example.com"
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      tlsChallenge: {}
+
+# Adding the access logs to the docker logging output
+accessLog: {}
