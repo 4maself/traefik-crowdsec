@@ -1,0 +1,107 @@
+version: '3'
+services:
+  traefik:
+    image: traefik:v2.5
+    container_name: "traefik"
+    ports:
+      # I have configured Traefik to serve metrics on 6060.
+      # I'm not using this port on the host network as another container in the traefik_network can collect it.
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml"
+      - "./traefik/config:/config"
+    networks:
+      - traefik_network
+
+# The Traefik certs dumper reads the certificates from the acme.json file and puts the crt and key file into it.
+# You can use this to add them to the containers or services that specifically need one.
+# If you don't need it, you can remove it.
+  traefik-certs-dumper:
+    image: ldez/traefik-certs-dumper:latest
+    container_name: "traefik-dumper"
+    entrypoint: sh -c '
+      apk add jq
+      ; while ! [ -e /acme.json ]
+      || ! [ `jq ".[] | .Certificates | length" /acme.json` != 0 ]; do
+      sleep 1
+      ; done
+      && traefik-certs-dumper file --version v2 --watch
+      --source /acme.json --dest /dump --domain-subdir=true'
+    volumes:
+      - "./traefik/acme.json:/acme.json"
+      - "./traefik/certs/:/dump"
+    networks:
+      - traefik_network
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: "crowdsec"
+    environment:
+      # Add your collections here if you find more
+      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/linux"
+    depends_on:
+      - 'traefik'
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./crowdsec/data/:/var/lib/crowdsec/data/"
+      - "./crowdsec/config/:/etc/crowdsec/"
+    networks:
+      - traefik_network
+
+  bouncer:
+    image: fbonalair/traefik-crowdsec-bouncer:latest
+    container_name: "crowdsec-bouncer"
+    environment:
+      # You'll need to generate the api key through the crowdsec container
+      CROWDSEC_BOUNCER_API_KEY: SECRET-API-KEY
+      CROWDSEC_AGENT_HOST: crowdsec:8080
+    networks:
+      - traefik_network
+    depends_on:
+      - 'crowdsec'
+      
+# Instead of using prometheus+grafana, you could also use the metabase dashboard that Crowdsec uses out of the box
+# See https://github.com/crowdsecurity/example-docker-compose for the setup
+  prometheus:
+    image: bitnami/prometheus:latest
+    user: 1000:1000
+    container_name: "prometheus"
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./prometheus/data:/prometheus"
+      - "./prometheus/config:/etc/prometheus"
+    networks:
+      - traefik_network
+    depends_on:
+      - 'bouncer'
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: "grafana"
+    volumes:
+      - "./grafana:/var/lib/grafana"
+    networks:
+      - traefik_network
+    environment:
+      - GF_SERVER_DOMAIN=dashboard.example.com
+      - GF_SERVER_ROOT_URL=https://dashboard.example.com
+      # I've added these plugins over time. Add/remove to your heart's desire.
+      - GF_INSTALL_PLUGINS=grafana-worldmap-panel,flant-statusmap-panel,grafana-piechart-panel,grafana-polystat-panel
+      - GF_SERVER_ENABLE_GZIP=true
+    labels:
+      # Traefik reads these to collect certificates
+      # Don't forget to add a CNAME record for your dashboard if you plan on using this.
+      - "traefik.http.routers.dash.entrypoints=web-secure"
+      - "traefik.http.routers.dash.rule=Host(`dashboard.example.com`)"
+      - "traefik.http.routers.dash.tls.certresolver=letsencrypt-testing"
+      - "traefik.http.routers.dash.middlewares=redirect@file"
+    depends_on:
+      - 'bouncer'
+
+networks:
+  traefik_network:
+    name: traefik_network

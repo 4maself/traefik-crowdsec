@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+  - job_name: traefik # Network metrics for internet facing services
+    # https://doc.traefik.io/traefik/observability/metrics/overview/
+    static_configs:
+      - targets:
+          - traefik:6060
+        labels:
+          host: MyHost
+    metric_relabel_configs:
+      # Only keep data that is used in graphs to reduce size
+      - source_labels: [__name__]
+        regex: traefik_service_requests_total|traefik_service_request_duration_seconds_sum|traefik_service_request_duration_seconds_count
+        action: keep
+  - job_name: crowdsec # Security related metrics
+    # https://doc.crowdsec.net/Crowdsec/v1/observability/prometheus/
+    static_configs:
+      - targets:
+          - crowdsec:6060
+        labels:
+          machine: MyMachine
+    metric_relabel_configs:
+      # Only keep data that is used in graphs to reduce size
+      - source_labels: [__name__]
+        regex: cs_.+
+        action: keep
