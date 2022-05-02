@@ -36,7 +36,7 @@ certificatesResolvers:
   letsencrypt:
     acme:
       email: "my-email@example.com"
-      storage: acme.json
+      storage: /acme.json
       tlsChallenge: {}
 # Use letsencrypt-testing to make sure your setup is working before moving everything over to the production server of LetsEncrypt      
   letsencrypt-testing:

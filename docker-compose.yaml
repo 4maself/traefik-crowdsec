@@ -16,6 +16,9 @@ services:
     networks:
       - traefik_network
 
+# The Traefik certs dumper reads the certificates from the acme.json file and puts the crt and key file into it.
+# You can use this to add them to the containers or services that specifically need one.
+# If you don't need it, you can remove it.
   traefik-certs-dumper:
     image: ldez/traefik-certs-dumper:latest
     container_name: "traefik-dumper"
@@ -42,7 +45,7 @@ services:
     depends_on:
       - 'traefik'
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./crowdsec/data/:/var/lib/crowdsec/data/"
       - "./crowdsec/config/:/etc/crowdsec/"
     networks:
@@ -64,6 +67,7 @@ services:
 # See https://github.com/crowdsecurity/example-docker-compose for the setup
   prometheus:
     image: bitnami/prometheus:latest
+    user: 1000:1000
     container_name: "prometheus"
     ports:
       - "9090:9090"
@@ -99,5 +103,5 @@ services:
       - 'bouncer'
 
 networks:
-  narwal_external:
-    external: true
+  traefik_network:
+    name: traefik_network
